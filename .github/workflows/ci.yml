@@ -36,4 +36,4 @@ jobs:
     needs: publish
 
     steps:
-      - run: 'curl -X POST -H "token: ${{ secrets.RESTART_HOOK_TOKEN }}" ${{ secrets.RESTART_HOOK_URL }}'
+      - run: 'curl --fail -X POST -H "token: ${{ secrets.RESTART_HOOK_TOKEN }}" ${{ secrets.RESTART_HOOK_URL }}'
