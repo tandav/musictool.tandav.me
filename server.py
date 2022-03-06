@@ -56,12 +56,8 @@ async def root(): return RedirectResponse('/circle/diatonic/')
 async def favicon(): return FileResponse(static_folder / 'favicon.ico')
 
 
-
 @app.get("/circle/{kind}/", response_class=HTMLResponse)
 async def circle_diatonic(kind: str):
-
-
-
     html = ''
     for i, scale in enumerate(majors[kind], start=1):
         html += scale.with_html_classes(('kinda_circle', f'_{i}'))
