@@ -4,7 +4,6 @@ RUN pip install fastapi uvicorn aiofiles musictool
 
 EXPOSE 8001
 
-RUN mkdir -p /app/musictool
 RUN mkdir -p /app/static
 COPY static /app/static
 COPY *.py /app/
