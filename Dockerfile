@@ -1,6 +1,6 @@
 FROM python:3.10-alpine
 
-RUN pip install fastapi uvicorn aiofiles musictool
+RUN pip install -r requirements.txt
 
 EXPOSE 8001
 
