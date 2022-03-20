@@ -56,10 +56,19 @@ async def root(): return RedirectResponse('/circle/diatonic/')
 async def favicon(): return FileResponse(static_folder / 'favicon.ico')
 
 
+@app.get("/available_scales", response_class=HTMLResponse)
+async def available_scales():
+    html = '<h1>Available scales for circle of fifths</h1>'
+    return html + '\n'.join(f"<a href='/circle/{k}/'>/circle/{k}/</a><br>" for k in majors.keys())
+
+
 @app.get("/circle/{kind}/", response_class=HTMLResponse)
 async def circle_diatonic(kind: str):
+    if (majors_:= majors.get(kind)) is None:
+        return RedirectResponse('/available_scales')
+
     html = ''
-    for i, scale in enumerate(majors[kind], start=1):
+    for i, scale in enumerate(majors_, start=1):
         html += scale.with_html_classes(('kinda_circle', f'_{i}'))
 
     return f'''\
@@ -79,7 +88,9 @@ async def circle_selected(kind: str, selected_major: str):
         'melodic': 'm_major',
         'pentatonic': 'p_major',
         'sudu': 's_major',
-    }[kind]
+    }.get(kind)
+    if m is None:
+        return RedirectResponse('/available_scales')
     html = ''
     selected = all_scales[kind][selected_major, m]
     for i, scale in enumerate(majors[kind], start=1):
