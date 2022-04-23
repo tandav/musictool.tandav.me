@@ -9,10 +9,14 @@ from fastapi.staticfiles import StaticFiles
 from musictool import config
 from musictool.chord import SpecificChord
 from musictool.note import SpecificNote
+from musictool.scale import Scale
 from musictool.scale import ComparedScales
 from musictool.scale import all_scales
 from musictool.scale import majors
+from musictool.noteset import NoteRange
 from html_table import midi_table_html
+
+noterange = NoteRange('C2', 'C4', noteset=Scale.from_name('C', 'major'))
 
 chromatic_notes_set = set(config.chromatic_notes)
 
@@ -35,9 +39,10 @@ def scale_not_found():
 @app.get("/play_chord/{chord}")
 async def play_chord(chord: str):
     print('PLAYIN CHORD', chord)
-    notes = tuple(SpecificNote(n, octave=5) for n in chord)
-    raise NotImplementedError('REWRITE: instead of rely on 1st note explicitly pass root CEG_C')
-    await SpecificChord(frozenset(notes), root=notes[0]).play(bass=-1)
+    # notes = tuple(SpecificNote(n, octave=5) for n in chord)
+    # raise NotImplementedError('REWRITE: instead of rely on 1st note explicitly pass root CEG_C')
+    # await SpecificChord(frozenset(notes), root=notes[0]).play(bass=-1)
+    await SpecificChord.from_str(chord).play(seconds=1)
     return {'status': 'play_chord success'}
 
 
@@ -117,6 +122,64 @@ async def circle(): return RedirectResponse('/circle/diatonic')
 
 @app.get("/midi_table", response_class=HTMLResponse)
 async def midi_table(): return midi_table_html()
+
+
+@app.get("/diads", response_class=HTMLResponse)
+async def diads():
+    lines = []
+    for row_note in noterange:
+        lines.append('<tr>')
+        for col_note in noterange:
+            chord = SpecificChord(frozenset({row_note, col_note}))
+            if len(chord) > 1 and chord[-1] - chord[0] >= 12:
+                classes = "class='big_interval'"
+            else:
+                classes = ''
+            lines.append(f"    <td {classes}onclick=play_chord('{chord}')>{chord}</td>")
+        lines.append('</tr>')
+    table_data = '\n'.join(lines)
+
+    "< span class ='chord_button {chord.name} {is_shared}' onclick=play_chord('{chord.str_chord}') > {i} < / span >"
+
+    html = f'''
+    <script src="/static/play.js"></script>
+    <h1>diads table</h1>
+    <table>
+    <tbody>
+    </tbody>
+    
+    {table_data}
+    </table>
+    '''
+
+    css = '''
+    <style>
+    body {
+        font-family: 'SF Mono';
+    }
+    table, th, td {
+      border: 1px solid #dddddd;
+      border-collapse: collapse;
+    }
+    
+    td {
+        width: 50px;
+        height: 50px;
+    }
+
+    th {
+        writing-mode: vertical-lr;
+        max-height: 100px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .big_interval {
+        background-color: rgba(255, 0, 0, 0.5);
+    }
+    </style>
+    '''
+    return html + css
 
 
 # @app.get("/{kind}", response_class=HTMLResponse)
