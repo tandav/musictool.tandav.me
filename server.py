@@ -18,6 +18,7 @@ from html_table import midi_table_html
 
 scale = Scale.from_name('C', 'major')
 noterange = NoteRange('C2', 'C4', noteset=scale)
+lowest = SpecificNote.from_str('C1')
 
 chromatic_notes_set = set(config.chromatic_notes)
 
@@ -68,61 +69,29 @@ async def available_scales():
     return html + '\n'.join(f"<a href='/circle/{k}/'>/circle/{k}/</a><br>" for k in majors.keys())
 
 
-@app.get("/circle/{kind}/", response_class=HTMLResponse)
-async def circle_diatonic(kind: str):
-    if (majors_:= majors.get(kind)) is None:
-        return RedirectResponse('/available_scales')
-
-    html = ''
-    for i, scale in enumerate(majors_, start=1):
-        html += scale.with_html_classes(('kinda_circle', f'_{i}'))
-
-    return f'''\
-    <link rel="stylesheet" href="/static/circle.css">
-    <link rel="stylesheet" href="/static/main.css">
-    <script src="/static/play.js"></script>
-    <div class='container'>{html}</div>
-    '''
 
 
-@app.get("/circle/{kind}/{selected_major}", response_class=HTMLResponse)
-async def circle_selected(kind: str, selected_major: str):
-    # workaround, maybe refactor this later
-    m = {
-        'diatonic': 'major',
-        'harmonic': 'h_major',
-        'melodic': 'm_major',
-        'pentatonic': 'p_major',
-        'sudu': 's_major',
-    }.get(kind)
-    if m is None:
-        return RedirectResponse('/available_scales')
-    html = ''
-    selected = all_scales[kind][selected_major, m]
-    for i, scale in enumerate(majors[kind], start=1):
-        if scale == selected:
-            html += ComparedScales(selected, scale).with_html_classes(('kinda_circle', f'_{i}', 'selected_scale'))
-        else:
-            html += ComparedScales(selected, scale).with_html_classes(('kinda_circle', f'_{i}'))
-
-    return f'''\
-    <link rel="stylesheet" href="/static/circle.css">
-    <link rel="stylesheet" href="/static/main.css">
-    <script src="/static/play.js"></script>
-    <div class='container'>{html}</div>
-    '''
+# @app.get("/diads", response_class=HTMLResponse)
+# async def diads_root():
+#     return RedirectResponse(f'/diads/lowest/{lowest}')
 
 
-@app.get("/circle")
-async def circle(): return RedirectResponse('/circle/diatonic')
+@app.get('/diads/lowest_up')
+async def diads_lowest_up():
+    global lowest
+    lowest = scale.add_note(lowest, 1)
+    print(lowest)
+    # return diads()
+    return RedirectResponse('/diads')
 
 
-# @app.get("/midi_piano", response_class=HTMLResponse)
-# async def midi_piano(): return midi_piano_html()
-
-
-@app.get("/midi_table", response_class=HTMLResponse)
-async def midi_table(): return midi_table_html()
+@app.get('/diads/lowest_down')
+async def diads_lowest_down():
+    global lowest
+    lowest = scale.add_note(lowest, -1)
+    print(lowest)
+    # return diads()
+    return RedirectResponse('/diads')
 
 
 @app.get("/diads", response_class=HTMLResponse)
@@ -131,14 +100,14 @@ async def diads():
     for row_note in noterange:
         lines.append('<tr>')
         for col_note in noterange:
-            chord = SpecificChord(frozenset({row_note, col_note}))
+            chord = SpecificChord(frozenset({lowest, row_note, col_note}))
             td_classes = set()
 
             if col_note.abstract == 'C':
                 td_classes.add('C_col')
             if row_note.abstract == 'C':
                 td_classes.add('C_row')
-            if len(chord) > 1 and chord[-1] - chord[0] >= 12:
+            if len(chord) == 3 and chord[2] - chord[1] >= 12:
                 td_classes.add('greyed')
             if row_note < col_note:
                 td_classes.add('greyed')
@@ -157,8 +126,9 @@ async def diads():
     "< span class ='chord_button {chord.name} {is_shared}' onclick=play_chord('{chord.str_chord}') > {i} < / span >"
 
     html = f'''
-    <script src="/static/play.js"></script>
-    <h1>diads table</h1>
+    <h1>diads table {lowest}</h1>
+    <a href='/diads/lowest_down'>lowest_down</a>
+    <a href='/diads/lowest_up'>lowest_up</a>
     <table>
     <tbody>
     </tbody>
@@ -166,6 +136,7 @@ async def diads():
     {table_data}
     </table>
     '''
+    background_color = scale.note_scales[lowest.abstract]
 
     css = '''
     <style>
@@ -184,7 +155,8 @@ async def diads():
     }
 
     table, td {
-      border: 1px solid #dddddd;
+        font-size: 0.8em;
+        border: 1px solid #dddddd;
     }
     
     td {
@@ -222,4 +194,19 @@ async def diads():
     }
     </style>
     '''
-    return html + css
+
+    # <script src="/static/ui.js"></script>
+
+
+    return f'''
+    <html>
+    <head>
+    <script src="/static/play.js"></script>
+    </head>
+    <body class='{background_color}'>
+    {html}
+    {css}
+    </body>
+    ''' + '''
+    <script src="/static/ui.js"></script>
+    '''
