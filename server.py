@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from musictool import config
 from musictool.chord import SpecificChord
+from musictool.note import Note
 from musictool.note import SpecificNote
 from musictool.scale import Scale
 from musictool.scale import ComparedScales
@@ -69,46 +70,47 @@ async def available_scales():
     return html + '\n'.join(f"<a href='/circle/{k}/'>/circle/{k}/</a><br>" for k in majors.keys())
 
 
-
-
-# @app.get("/diads", response_class=HTMLResponse)
-# async def diads_root():
-#     return RedirectResponse(f'/diads/lowest/{lowest}')
-
-
-@app.get('/diads/lowest_up')
-async def diads_lowest_up():
+@app.get('/triads/lowest_up')
+async def triads_lowest_up():
     global lowest
     lowest = scale.add_note(lowest, 1)
     print(lowest)
-    # return diads()
-    return RedirectResponse('/diads')
+    return RedirectResponse('/triads')
 
 
-@app.get('/diads/lowest_down')
-async def diads_lowest_down():
+@app.get('/triads/lowest_down')
+async def triads_lowest_down():
     global lowest
     lowest = scale.add_note(lowest, -1)
     print(lowest)
-    # return diads()
-    return RedirectResponse('/diads')
+    return RedirectResponse('/triads')
 
 
-@app.get("/diads", response_class=HTMLResponse)
-async def diads():
+async def helper(n_notes: int):
     lines = []
     for row_note in noterange:
         lines.append('<tr>')
         for col_note in noterange:
-            chord = SpecificChord(frozenset({lowest, row_note, col_note}))
+            if n_notes == 2:
+                chord = SpecificChord(frozenset({row_note, col_note}))
+            elif n_notes == 3:
+                chord = SpecificChord(frozenset({lowest, row_note, col_note}))
+            else:
+                raise NotImplementedError
+
             td_classes = set()
 
             if col_note.abstract == 'C':
                 td_classes.add('C_col')
             if row_note.abstract == 'C':
                 td_classes.add('C_row')
-            if len(chord) == 3 and chord[2] - chord[1] >= 12:
+
+            if (
+                (len(chord) == 3 and chord[2] - chord[1] >= 12) or
+                (len(chord) == 2 and chord[1] - chord[0] >= 12)
+            ):
                 td_classes.add('greyed')
+
             if row_note < col_note:
                 td_classes.add('greyed')
 
@@ -125,10 +127,17 @@ async def diads():
 
     "< span class ='chord_button {chord.name} {is_shared}' onclick=play_chord('{chord.str_chord}') > {i} < / span >"
 
+    if n_notes == 2:
+        h1 = f"<h1>diads</h1>"
+    elif n_notes == 3:
+        h1 = f"<h1>triads lowest={lowest}</h1>"
     html = f'''
-    <h1>diads table {lowest}</h1>
-    <a href='/diads/lowest_down'>lowest_down</a>
-    <a href='/diads/lowest_up'>lowest_up</a>
+    {h1}
+    <a href='/diads'>diads</a>
+    <a href='/triads'>triads</a><br>
+    <br>
+    <a href='/triads/lowest_down'>lowest_down</a>
+    <a href='/triads/lowest_up'>lowest_up</a>
     <table>
     <tbody>
     </tbody>
@@ -136,7 +145,10 @@ async def diads():
     {table_data}
     </table>
     '''
-    background_color = scale.note_scales[lowest.abstract]
+    if n_notes == 2:
+        background_color = 'white'
+    elif n_notes == 3:
+        background_color = scale.note_scales[lowest.abstract]
 
     css = '''
     <style>
@@ -197,7 +209,6 @@ async def diads():
 
     # <script src="/static/ui.js"></script>
 
-
     return f'''
     <html>
     <head>
@@ -210,3 +221,13 @@ async def diads():
     ''' + '''
     <script src="/static/ui.js"></script>
     '''
+
+
+@app.get("/diads", response_class=HTMLResponse)
+async def diads():
+    return await helper(2)
+
+
+@app.get("/triads", response_class=HTMLResponse)
+async def triads():
+    return await helper(3)
