@@ -127,15 +127,21 @@ async def midi_table(): return midi_table_html()
 @app.get("/diads", response_class=HTMLResponse)
 async def diads():
     lines = []
-    for row_note in noterange:
+    for i, row_note in enumerate(noterange):
         lines.append('<tr>')
-        for col_note in noterange:
+        for j, col_note in enumerate(noterange):
             chord = SpecificChord(frozenset({row_note, col_note}))
+            td_classes = []
             if len(chord) > 1 and chord[-1] - chord[0] >= 12:
-                classes = "class='big_interval'"
-            else:
-                classes = ''
-            lines.append(f"    <td {classes}onclick=play_chord('{chord}')>{chord}</td>")
+                td_classes.append('big_interval')
+            if col_note.abstract == 'C':
+                td_classes.append('C_col')
+            if row_note.abstract == 'C':
+                td_classes.append('C_row')
+            if j > i:
+                td_classes.append('upper_triangle')
+            td_classes = f"class='{' '.join(td_classes)}'" if td_classes else ''
+            lines.append(f"    <td {td_classes}onclick=play_chord('{chord}')>{chord}</td>")
         lines.append('</tr>')
     table_data = '\n'.join(lines)
 
@@ -157,14 +163,25 @@ async def diads():
     body {
         font-family: 'SF Mono';
     }
-    table, th, td {
+
+    table, td {
       border: 1px solid #dddddd;
-      border-collapse: collapse;
     }
     
     td {
         width: 50px;
         height: 50px;
+    }
+    
+    td.C_col {
+        border-left: 1px solid black;
+    }
+    
+    td.C_row {
+        border-top: 1px solid black;
+    }
+    td.upper_triangle {
+        color: rgba(0, 0, 0, 0.1);
     }
 
     th {
@@ -174,183 +191,10 @@ async def diads():
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .big_interval {
         background-color: rgba(255, 0, 0, 0.5);
     }
     </style>
     '''
     return html + css
-
-
-# @app.get("/{kind}", response_class=HTMLResponse)
-# async def kind(kind: str):
-#     return RedirectResponse(f'/{kind}/C/{getattr(config, kind)[0]}')
-#
-# @app.get("/{kind}/{root}", response_class=HTMLResponse)
-# async def kind_root(kind: str, root: str): return RedirectResponse(f'/{kind}/{root}/{getattr(config, kind)[0]}')
-#
-#
-# @app.get("/{kind}/{root}/{name}", response_class=HTMLResponse)
-# async def root_name_scale(kind: str, root: str, name: str, load_all=False):
-#
-#     if root not in chromatic_notes_set:
-#         return RedirectResponse('/scale_not_found')
-#
-#     roots = ' '.join(f"<a href='/{kind}/{note}/{name}'>{note}</a>" for note in config.chromatic_notes)
-#
-#     initial = []
-#     for _name in util.iter_scales(kind):
-#         scale = all_scales[kind][root, _name]
-#         if _name == name:
-#             initial.append(scale.with_html_classes(('selected_scale',)))
-#             selected_scale = scale
-#         else:
-#             initial.append(scale._repr_html_())
-#     initial = '\n'.join(initial)
-#
-#     neighs = neighbors(selected_scale)
-#     neighs_html = ''
-#
-#     if load_all:
-#         min_shared = 0
-#     else:
-#         min_shared = config.neighsbors_min_shared[kind]
-#
-#     for n_intersect in sorted(neighs.keys(), reverse=True):
-#         if n_intersect < min_shared:
-#             break
-#         neighs_html += f'''
-#         <h3>{n_intersect} shared notes{f', {util.n_intersect_notes_to_n_shared_chords[n_intersect]} shared chords (click to see)' if kind == 'diatonic' else ''}</h3>
-#         <div class="neighbors">
-#         {''.join(n._repr_html_() for n in neighs[n_intersect])}
-#         </div>
-#         <hr>
-#         '''
-#
-#     kind_links = f"<a href='/diatonic/{root}/major'>diatonic</a>"
-#     kind_links += f" <a href='/pentatonic/{root}/p_major'>pentatonic</a>"
-#
-#     return f'''
-#     <link rel="stylesheet" href="/static/main.css">
-#     <header><a href='/'>home</a> <a href='https://github.com/tandav/piano_scales'>github</a> | root: {roots} | {kind_links} | <a href='/circle'>circle</a></header>
-#     <hr>
-#     <h3>select scale</h3>
-#     <div class='initial'>{initial}</div>
-#     <hr>
-#     {neighs_html}
-#     {'' if min_shared == 0 else f"<a href='/{kind}/{root}/{name}/all'>load all scales</a>"}
-#     '''
-#
-# @app.get("/{kind}/{root}/{name}/all", response_class=HTMLResponse)
-# async def root_name_scale_load_all(kind: str, root: str, name: str):
-#     return await root_name_scale(kind, root, name, load_all=True)
-#
-#
-# @app.get("/{kind}/{left_root}/{left_name}/compare_to/{right_root}/{right_name}/", response_class=HTMLResponse)
-# async def compare_scales(kind: str, left_root: str, left_name: str, right_root: str, right_name: str):
-#     roots = ' '.join(f"<a href='/{kind}/{note}/{left_name}'>{note}</a>" for note in config.chromatic_notes)
-#     kind_links = f"<a href='/diatonic/{left_root}/major'>diatonic</a>"
-#     kind_links += f" <a href='/pentatonic/{left_root}/p_major'>pentatonic</a>"
-#
-#     left = all_scales[kind][left_root, left_name]
-#     right = ComparedScale(left, all_scales[kind][right_root, right_name])
-#     n_shared_notes  = len(right.shared_notes)
-#     n_shared_chords = len(right.shared_chords)
-#
-#     for i, chord in enumerate(left.chords, start=1):
-#         chord.number = i
-#         if chord in right.shared_chords:
-#             chord.label = f'left_{chord.str_chord}'
-#
-#     for i, chord in enumerate(right.chords, start=1):
-#         chord.number = i
-#         if chord in right.shared_chords:
-#             chord.label = f'right_{chord.str_chord}'
-#
-#     js = '''
-#     const arrows = []
-#     '''
-#
-#     for chord in right.shared_chords:
-#         #js += f"new LeaderLine(document.getElementById('left_{chord.str_chord}'), document.getElementById('right_{chord.str_chord}')).setOptions({{startSocket: 'bottom', endSocket: 'top'}});\n"
-#         js += f'''
-#         arrows.push(new LeaderLine(document.getElementById('left_{chord.str_chord}'), document.getElementById('right_{chord.str_chord}')))
-#         '''
-#
-#     js += '''
-#     const updateArrows = () => {
-#         if (window.innerWidth <= 1080) {
-#             var startSocket = 'right'
-#             var endSocket = 'left'
-#         } else {
-#             var startSocket = 'bottom'
-#             var endSocket = 'top'
-#         }
-#
-#         for (const arrow of arrows) {
-#             arrow.setOptions({startSocket: startSocket, endSocket: endSocket})
-#         }
-#     }
-#     updateArrows()
-#     window.onresize = updateArrows
-#     '''
-#
-#     return f'''
-#     <link rel="stylesheet" href="/static/main.css">
-#     <script src="/static/leader-line.min.js"></script>
-#     <script src="/static/play.js"></script>
-#
-#     <header><a href='/'>home</a> <a href='https://github.com/tandav/piano_scales'>github</a> | root: {roots} | {kind_links}</header>
-#     <h1>compare scales</h1>
-#     <p>{n_shared_notes} shared notes, {n_shared_chords} shared chords</p>
-#     <div class='compare_scales'>
-#     <div class='left'>{left!r}</div>
-#     <div class='right'>{right!r}</div></div>
-#     <h1>chords</h1>
-#     <div class='compare_chords'>
-#     <ol class='chords_row left'>{''.join(f'{chord!r}' for chord in left.chords)}</ol>
-#     <ol class='chords_row right'>{''.join(f'{chord!r}' for chord in right.chords)}</ol>
-#     <script>
-#     {js}
-#     </script>
-#     </div>
-#     '''
-
-# @app.get("/{kind}/{left_root}/{left_name}/compare_to/{right_root}/{right_name}/play_chord_{chord}", response_class=HTMLResponse)
-# async def play_chord(kind: str, left_root: str, left_name: str, right_root: str, right_name: str, chord: str):
-#     print('PLAYIN CHORD', chord)
-#     await Chord(chord).play(bass=-2)
-#     return await compare_scales(kind, left_root, left_name, right_root, right_name)
-
-# @app.get("/{kind}/{root}/{name}/all_chords", response_class=HTMLResponse)
-# async def all_chords(kind: str, root: str, name: str):
-#
-#     if root not in chromatic_notes_set:
-#         return RedirectResponse('/scale_not_found')
-#
-#     roots = ' '.join(f"<a href='/{kind}/{note}/{name}/all_chords'>{note}</a>" for note in config.chromatic_notes)
-#     kind_links = f"<a href='/diatonic/{root}/major'>diatonic</a>"
-#     kind_links += f" <a href='/pentatonic/{root}/p_major'>pentatonic</a>"
-#
-#
-#     scale = all_scales[kind][root, name]
-#     n = scale
-#     payload = f"<div class='chord_buttons_row'><span class='scale_name {n.name}'>{n.root} {n.name}</span>" + ''.join(f"<span class='chord_button {chord.name}' onclick=play_chord('{chord.str_chord}')>{i}</span>\n" for i, chord in enumerate(n.chords, start=1)) + '</div>\n'
-#     neighs = neighbors(scale)
-#     for n_intersect in sorted(neighs.keys(), reverse=True):
-#         payload += f"<h3>{n_intersect} shared notes{f', {util.n_intersect_notes_to_n_shared_chords[n_intersect]} shared chords' if kind == 'diatonic' else ''}</h3>\n"
-#         for n in neighs[n_intersect]:
-#             payload += f"<div class='chord_buttons_row'><span class='scale_name {n.name}'>{n.root} {n.name}</span>"
-#             for i, chord in enumerate(n.chords, start=1):
-#                 is_shared = 'is_shared' if chord in n.shared_chords else ''
-#                 payload += f"<span class='chord_button {chord.name} {is_shared}' onclick=play_chord('{chord.str_chord}')>{i}</span>\n"
-#             payload += '</div>\n'
-#
-#     return f'''
-#     <link rel="stylesheet" href="/static/main.css">
-#     <script src="/static/play.js"></script>
-#
-#     <header><a href='/'>home</a> <a href='https://github.com/tandav/piano_scales'>github</a> | root: {roots} | {kind_links}</header>
-#     <hr><br>
-#     {payload}
-#     '''
