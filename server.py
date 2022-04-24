@@ -16,7 +16,8 @@ from musictool.scale import majors
 from musictool.noteset import NoteRange
 from html_table import midi_table_html
 
-noterange = NoteRange('C2', 'C4', noteset=Scale.from_name('C', 'major'))
+scale = Scale.from_name('C', 'major')
+noterange = NoteRange('C2', 'C4', noteset=scale)
 
 chromatic_notes_set = set(config.chromatic_notes)
 
@@ -127,19 +128,27 @@ async def midi_table(): return midi_table_html()
 @app.get("/diads", response_class=HTMLResponse)
 async def diads():
     lines = []
-    for i, row_note in enumerate(noterange):
+    for row_note in noterange:
         lines.append('<tr>')
-        for j, col_note in enumerate(noterange):
+        for col_note in noterange:
             chord = SpecificChord(frozenset({row_note, col_note}))
-            td_classes = []
-            if len(chord) > 1 and chord[-1] - chord[0] >= 12:
-                td_classes.append('big_interval')
+            td_classes = set()
+
             if col_note.abstract == 'C':
-                td_classes.append('C_col')
+                td_classes.add('C_col')
             if row_note.abstract == 'C':
-                td_classes.append('C_row')
-            if j > i:
-                td_classes.append('upper_triangle')
+                td_classes.add('C_row')
+            if len(chord) > 1 and chord[-1] - chord[0] >= 12:
+                td_classes.add('greyed')
+            if row_note < col_note:
+                td_classes.add('greyed')
+
+            if 'greyed' not in td_classes:
+                scale_ = scale.note_scales[col_note.abstract]
+                td_classes.add(scale_)
+                # assert row_note <= col_note, (row_note, col_note, i, j)
+            #     sertionError: (D2, C2, 1, 0)
+
             td_classes = f"class='{' '.join(td_classes)}'" if td_classes else ''
             lines.append(f"    <td {td_classes}onclick=play_chord('{chord}')>{chord}</td>")
         lines.append('</tr>')
@@ -160,6 +169,16 @@ async def diads():
 
     css = '''
     <style>
+        :root {
+        --major: #FFFFFF;
+        --dorian: #54E346;
+        --phrygian: #00FFCC;
+        --lydian: #68A6FC;
+        --mixolydian: #FFF47D;
+        --minor: #D83A56;
+        --locrian: #B980F0;
+    }
+    
     body {
         font-family: 'SF Mono';
     }
@@ -180,9 +199,7 @@ async def diads():
     td.C_row {
         border-top: 1px solid black;
     }
-    td.upper_triangle {
-        color: rgba(0, 0, 0, 0.1);
-    }
+
 
     th {
         writing-mode: vertical-lr;
@@ -191,9 +208,17 @@ async def diads():
         overflow: hidden;
         text-overflow: ellipsis;
     }
-
-    .big_interval {
-        background-color: rgba(255, 0, 0, 0.5);
+    .major { background-color: var(--major); }
+    .dorian { background-color: var(--dorian); }
+    .phrygian { background-color: var(--phrygian); }
+    .lydian { background-color: var(--lydian); }
+    .mixolydian { background-color: var(--mixolydian); }
+    .minor { background-color: var(--minor); }
+    .locrian { background-color: var(--locrian); }
+    
+    td.greyed {
+        color: rgba(0, 0, 0, 0.1);
+        background-color: rgba(0, 0, 0, 0.1);
     }
     </style>
     '''
