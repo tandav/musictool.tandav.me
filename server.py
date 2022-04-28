@@ -4,6 +4,12 @@ import random
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 
+import os
+os.environ['MIDI_DEVICE'] = 'IAC Driver Bus 1'
+
+import mido
+port = mido.open_input(os.environ['MIDI_DEVICE'])
+
 app = FastAPI()
 
 html = """
@@ -49,8 +55,15 @@ async def get():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    while True:
+
+    for msg in port:
+        await websocket.send_text(str(msg))
+
+    # while True:
         # data = await websocket.receive_text()
         # await websocket.send_text(f"Message text was: {data}")
-        await websocket.send_text(''.join(random.sample(string.ascii_lowercase, 8)))
-        await asyncio.sleep(1)
+
+        # await websocket.send_text(''.join(random.sample(string.ascii_lowercase, 8)))
+        # await asyncio.sleep(1)
+
+
