@@ -57,7 +57,7 @@ async def play_note(note: str, octave: int):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root(): return RedirectResponse('/circle/diatonic/')
+async def root(): return RedirectResponse('/diads')
 
 
 @app.get("/favicon.ico", response_class=HTMLResponse)
