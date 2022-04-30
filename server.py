@@ -3,6 +3,8 @@ import mido
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from musictool.note import SpecificNote
+from musictool.chord import SpecificChord
+from musictool.scale import Scale
 
 
 app = FastAPI()
@@ -27,7 +29,6 @@ html = """
         <h3>scale: <span id='scale'></span></h3>
         <h3>chord: <span id='chord'></span></h3>
         <h3>chord_step: <span id='chord_step'></span></h3>
-        <h3>message: <span id='message'></span></h3>
         
         <script>
             var client_id = Date.now()
@@ -49,7 +50,6 @@ html = """
                 document.getElementById('scale').textContent = data['scale']
                 document.getElementById('chord').textContent = data['chord']
                 document.getElementById('chord_step').textContent = data['chord_step']
-                document.getElementById('message').textContent = data['message']
             };
             function sendMessage(event) {
                 var input = document.getElementById("messageText")
@@ -84,28 +84,43 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 port = mido.open_input('IAC Driver Bus 1')
+playing_notes = set()
+scale = Scale.from_name('C', 'major')
+
 def sync_receive_midi_and_broadcast():
-    messages = []
-    for msg in port.iter_pending():
-        if msg.type not in {'note_on', 'note_off'}:
+    # messages = []
+    messages = list(port.iter_pending())
+    if not messages:
+        return
+    for msg in messages:
+        # if msg.type not in {'note_on', 'note_off'}:
+        #     continue
+
+        if msg.type == 'note_on':
+            playing_notes.add(SpecificNote.from_absolute_i(msg.note))
+        elif msg.type == 'note_off':
+            playing_notes.remove(SpecificNote.from_absolute_i(msg.note))
+        else:
             continue
-        note = SpecificNote.from_absolute_i(msg.note)
-        msg_str = f'{note} {msg.type}'
-        messages.append(msg_str)
-    return messages
+        # note = SpecificNote.from_absolute_i(msg.note)
+        # msg_str = f'{note} {msg.type}'
+        # messages.append(msg_str)
+    return SpecificChord(frozenset(playing_notes))
 
 
 async def receive_midi_and_broadcast(manager: ConnectionManager):
     loop = asyncio.get_running_loop()
     while True:
-        messages = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
-        for message in messages:
-            await manager.broadcast({
-                'scale': 'scale',
-                'chord': 'chord',
-                'chord_step': 'chord_step',
-                'message': message,
-            })
+        # messages = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
+        chord = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
+        if chord is None:
+            continue
+        await manager.broadcast({
+            'scale': str(scale),
+            'chord': str(chord),
+            'chord_step': 'chord_step',
+            # 'message': message,
+        })
 
 @app.on_event("startup")
 async def startup_event() -> None:
