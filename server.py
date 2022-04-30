@@ -33,6 +33,9 @@ html = """
         <div>possibilities: <span id='possibilities'></span></div>
         <div>chord_step: <span id='chord_step'></span></div>
         
+        <h2>piano</h2>
+        <div id='piano'></div>
+        
         <script>
             var client_id = Date.now()
             let i = 0
@@ -55,6 +58,7 @@ html = """
                 document.getElementById('chord_abstract').textContent = data['chord_abstract']
                 document.getElementById('possibilities').textContent = data['possibilities']
                 document.getElementById('chord_step').textContent = data['chord_step']
+                document.getElementById('piano').innerHTML = data['piano']
             };
             function sendMessage(event) {
                 var input = document.getElementById("messageText")
@@ -141,6 +145,7 @@ async def receive_midi_and_broadcast(manager: ConnectionManager):
             'chord_abstract': f'{chord.abstract}',
             'possibilities': f'{possibilities}',
             'chord_step': 'chord_step',
+            'piano': abstract._repr_html_(),
         })
 
 @app.on_event("startup")
