@@ -12,23 +12,6 @@ from fastapi.responses import HTMLResponse
 from musictool.note import SpecificNote
 
 
-class MidiServer(Thread):
-    def __init__(self, manager):
-        super().__init__()
-        self.port = mido.open_input('IAC Driver Bus 1')
-        self.queue = deque(maxlen=20)
-        self.manager = manager
-
-    def run(self) -> None:
-        for msg in self.port:
-            if msg.type not in {'note_on', 'note_off'}:
-                continue
-            note = SpecificNote.from_absolute_i(msg.note)
-            msg_str = f'{note} {msg.type}'
-            self.manager.broadcast(msg_str)
-            # self.queue.append(msg_str)
-
-
 app = FastAPI()
 
 
@@ -68,7 +51,6 @@ html = """
     </body>
 </html>
 """
-from fastapi.concurrency import run_in_threadpool
 
 
 class ConnectionManager:
@@ -92,8 +74,6 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
-# midi_server = MidiServer(manager)
-# midi_server.start()
 
 port = mido.open_input('IAC Driver Bus 1')
 def sync_receive_midi_and_broadcast():
@@ -116,8 +96,6 @@ async def receive_midi_and_broadcast(manager: ConnectionManager):
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """tasks to do at server startup"""
-    # asyncio.create_task(Gatherer().start_metering_daemon())
     asyncio.create_task(receive_midi_and_broadcast(manager))
 
 
@@ -137,33 +115,5 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
         manager.disconnect(websocket)
         await manager.broadcast(f"Client #{client_id} left the chat")
 
-    # else:  # secondary/read only connections
-    #     pass
-
-# for msg in port.iter_pending():
-#     if msg.type not in {'note_on', 'note_off'}:
-#         continue
-#     note = SpecificNote.from_absolute_i(msg.note)
-#     await websocket.send_text(str(note))
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#
-#     try:
-#         # for msg in port.iter_pending():
-#         for msg in port:
-#             if msg.type not in {'note_on', 'note_off'}:
-#                 continue
-#             note = SpecificNote.from_absolute_i(msg.note)
-#             await websocket.send_text(str(note))
-#     except WebSocketDisconnect:
-
-    # while True:
-        # data = await websocket.receive_text()
-        # await websocket.send_text(f"Message text was: {data}")
-
-        # await websocket.send_text(''.join(random.sample(string.ascii_lowercase, 8)))
-        # await asyncio.sleep(1)
 
 
