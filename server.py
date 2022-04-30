@@ -4,6 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from musictool.note import SpecificNote
 from musictool.chord import SpecificChord
+from musictool.chord import Chord
 from musictool.scale import Scale
 
 
@@ -26,9 +27,11 @@ html = """
         <ul id='messages'>
         </ul>
         
-        <h3>scale: <span id='scale'></span></h3>
-        <h3>chord: <span id='chord'></span></h3>
-        <h3>chord_step: <span id='chord_step'></span></h3>
+        <div>scale: <span id='scale'></span></div>
+        <div>chord: <span id='chord'></span></div>
+        <div>chord_abstract: <span id='chord_abstract'></span></div>
+        <div>possibilities: <span id='possibilities'></span></div>
+        <div>chord_step: <span id='chord_step'></span></div>
         
         <script>
             var client_id = Date.now()
@@ -49,6 +52,8 @@ html = """
                 // console.log(i)
                 document.getElementById('scale').textContent = data['scale']
                 document.getElementById('chord').textContent = data['chord']
+                document.getElementById('chord_abstract').textContent = data['chord_abstract']
+                document.getElementById('possibilities').textContent = data['possibilities']
                 document.getElementById('chord_step').textContent = data['chord_step']
             };
             function sendMessage(event) {
@@ -61,6 +66,14 @@ html = """
     </body>
 </html>
 """
+
+css = '''
+<style>
+body {
+    font-family: SFMono, monospace;
+}
+</style>
+'''
 
 
 class ConnectionManager:
@@ -115,11 +128,19 @@ async def receive_midi_and_broadcast(manager: ConnectionManager):
         chord = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
         if chord is None:
             continue
+
+        possibilities = []
+        abstract = chord.abstract
+
+        for note in abstract:
+            possibilities.append(Chord(abstract.notes, root=note))
+
         await manager.broadcast({
             'scale': str(scale),
-            'chord': str(chord),
+            'chord': f'{chord}',
+            'chord_abstract': f'{chord.abstract}',
+            'possibilities': f'{possibilities}',
             'chord_step': 'chord_step',
-            # 'message': message,
         })
 
 @app.on_event("startup")
@@ -129,7 +150,7 @@ async def startup_event() -> None:
 
 @app.get("/")
 async def get():
-    return HTMLResponse(html)
+    return HTMLResponse(html + css)
 
 
 @app.websocket("/ws/{client_id}")
