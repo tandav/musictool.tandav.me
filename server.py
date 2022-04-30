@@ -1,11 +1,4 @@
 import asyncio
-import string
-import random
-import os
-from collections import deque
-from threading import Event
-from threading import Thread
-
 import mido
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -19,10 +12,10 @@ html = """
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Chat</title>
+        <title>Midi Server</title>
     </head>
     <body>
-        <h1>WebSocket Chat</h1>
+        <h1>WebSocket Midi Server</h1>
         <h2>Your ID: <span id="ws-id"></span></h2>
         <form action="" onsubmit="sendMessage(event)">
             <input type="text" id="messageText" autocomplete="off"/>
@@ -30,16 +23,33 @@ html = """
         </form>
         <ul id='messages'>
         </ul>
+        
+        <h3>scale: <span id='scale'></span></h3>
+        <h3>chord: <span id='chord'></span></h3>
+        <h3>chord_step: <span id='chord_step'></span></h3>
+        <h3>message: <span id='message'></span></h3>
+        
         <script>
             var client_id = Date.now()
+            let i = 0
+            const n = 10
             document.querySelector("#ws-id").textContent = client_id;
             var ws = new WebSocket(`ws://localhost:8001/ws/${client_id}`);
             ws.onmessage = function(event) {
-                var messages = document.getElementById('messages')
-                var message = document.createElement('li')
-                var content = document.createTextNode(event.data)
-                message.appendChild(content)
-                messages.appendChild(message)
+                var data = JSON.parse(event.data);
+                console.log(data)
+                console.log(data['message'])
+                // var messages = document.getElementById('messages')
+                // var message = document.createElement('li')
+                // var content = document.createTextNode(event.data)
+                // message.appendChild(content)
+                // messages.appendChild(message)
+                i += 1
+                // console.log(i)
+                document.getElementById('scale').textContent = data['scale']
+                document.getElementById('chord').textContent = data['chord']
+                document.getElementById('chord_step').textContent = data['chord_step']
+                document.getElementById('message').textContent = data['message']
             };
             function sendMessage(event) {
                 var input = document.getElementById("messageText")
@@ -64,13 +74,11 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
+    async def broadcast(self, message: object):
         print('broadcast', message)
         for connection in self.active_connections:
-            await connection.send_text(message)
+            await connection.send_json(message)
+
 
 
 manager = ConnectionManager()
@@ -92,7 +100,12 @@ async def receive_midi_and_broadcast(manager: ConnectionManager):
     while True:
         messages = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
         for message in messages:
-            await manager.broadcast(message)
+            await manager.broadcast({
+                'scale': 'scale',
+                'chord': 'chord',
+                'chord_step': 'chord_step',
+                'message': message,
+            })
 
 @app.on_event("startup")
 async def startup_event() -> None:
