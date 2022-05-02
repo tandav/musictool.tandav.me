@@ -6,8 +6,7 @@ const play_chord = chord => {
     fetch(url)
 }
 
-const play_note = (note, octave) => {
-    const url = host + '/play_note/' + note + '/' + octave
-    console.log(url)
+const play_note = note => {
+    const url = host + '/play_note/' + note
     fetch(url)
 }

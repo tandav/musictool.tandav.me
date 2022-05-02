@@ -41,10 +41,10 @@ async def play_chord(chord: str):
     return {'status': 'play_chord success'}
 
 
-@app.get("/play_note/{note}/{octave}")
-async def play_note(note: str, octave: int):
-    print('PLAYIN NOTE', note, octave)
-    await SpecificNote(note, octave).play()
+@app.get("/play_note/{note}")
+async def play_note(note: str):
+    print('PLAYIN NOTE', note)
+    await SpecificNote.from_str(note).play()
     return {'status': 'play_note success'}
 
 
