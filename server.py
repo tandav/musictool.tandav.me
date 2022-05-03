@@ -6,7 +6,9 @@ from musictool.note import SpecificNote
 from musictool.chord import SpecificChord
 from musictool.chord import Chord
 from musictool.scale import Scale
-
+from musictool.noterange import NoteRange
+from musictool.piano import Piano
+from musictool import config
 
 app = FastAPI()
 
@@ -103,6 +105,20 @@ port = mido.open_input('IAC Driver Bus 1')
 playing_notes = set()
 scale = Scale.from_name('C', 'major')
 
+
+def chord_to_html(chord: SpecificChord) -> str:
+    piano = Piano(
+        note_colors=dict.fromkeys(chord.notes, config.RED),
+        squares={note: {'text': str(note), 'text_size': '8'} for note in chord},
+        noterange=NoteRange(SpecificNote('C', 2), SpecificNote('C', 8))
+    )._repr_svg_()
+    return f"""
+    <div class='specificchord'>
+    <h3 style='height:1em;' class='card_header'>{chord!r}</h3>
+    {piano}
+    </div>
+    """
+
 def sync_receive_midi_and_broadcast():
     # messages = []
     messages = list(port.iter_pending())
@@ -144,7 +160,7 @@ async def receive_midi_and_broadcast(manager: ConnectionManager):
             'chord_abstract': f'{chord.abstract}',
             'possibilities': f'{possibilities}',
             'chord_step': 'chord_step',
-            'piano': abstract._repr_html_(),
+            'piano': chord_to_html(chord),
         })
 
 @app.on_event("startup")
