@@ -1,4 +1,5 @@
 import asyncio
+import random
 import mido
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -108,9 +109,9 @@ playing_notes = set()
 scale = Scale.from_name('F', 'minor')
 
 
-def chord_to_html(chord: SpecificChord) -> str:
+def chord_to_html(chord: SpecificChord, note_colors: dict[SpecificNote, int] | None = None) -> str:
     piano = Piano(
-        note_colors=dict.fromkeys(chord.notes, config.RED),
+        note_colors=note_colors or dict.fromkeys(chord.notes, config.RED),
         squares={note: {'text': str(note), 'text_size': '8'} for note in chord},
         noterange=NoteRange(SpecificNote('C', 2), SpecificNote('C', 10))
     )._repr_svg_()
@@ -121,17 +122,34 @@ def chord_to_html(chord: SpecificChord) -> str:
     </div>
     """
 
-def sync_receive_midi_and_broadcast():
+# Payload = SpecificChord
+Payload = tuple[SpecificChord, dict[SpecificNote, int]]
+
+
+def channel_to_color(midi_channel: int) -> int:
+    palette = [config.RED, 0xFFCA3A, 0x8AC926, 0x1982C4, 0x6A4C93]
+    if midi_channel < len(palette):
+        return palette[midi_channel]
+    # else return random color
+    return int.from_bytes(random.randbytes(3), byteorder='little')
+
+
+def sync_receive_midi_and_broadcast() -> None | Payload:
     # messages = []
     messages = list(port.iter_pending())
     if not messages:
         return
+
+    colors = {}
     for msg in messages:
         # if msg.type not in {'note_on', 'note_off'}:
         #     continue
 
         if msg.type == 'note_on':
-            playing_notes.add(SpecificNote.from_absolute_i(msg.note))
+            print(msg)
+            note = SpecificNote.from_absolute_i(msg.note)
+            playing_notes.add(note)
+            colors[note] = channel_to_color(msg.channel)
         elif msg.type == 'note_off':
             playing_notes.remove(SpecificNote.from_absolute_i(msg.note))
         else:
@@ -139,17 +157,21 @@ def sync_receive_midi_and_broadcast():
         # note = SpecificNote.from_absolute_i(msg.note)
         # msg_str = f'{note} {msg.type}'
         # messages.append(msg_str)
-    return SpecificChord(frozenset(playing_notes))
+    return SpecificChord(frozenset(playing_notes)), colors
 
 
 async def receive_midi_and_broadcast(manager: ConnectionManager):
     loop = asyncio.get_running_loop()
+    note_colors = {}
     while True:
         # messages = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
-        chord = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
-        if chord is None:
+        payload = await loop.run_in_executor(None, sync_receive_midi_and_broadcast)
+        if payload is None:
             continue
 
+        chord, colors = payload
+        note_colors |= colors
+        note_colors = {note: color for note, color in note_colors.items() if note in chord}
         possibilities = []
         abstract = chord.abstract
 
@@ -162,7 +184,7 @@ async def receive_midi_and_broadcast(manager: ConnectionManager):
             'chord_abstract': f'{chord.abstract}',
             'possibilities': f'{possibilities}',
             'chord_step': 'chord_step',
-            'piano': chord_to_html(chord),
+            'piano': chord_to_html(chord, note_colors),
         })
 
 @app.on_event("startup")
