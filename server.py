@@ -47,7 +47,7 @@ html = """
             ws.onmessage = function(event) {
                 var data = JSON.parse(event.data);
                 console.log(data)
-                console.log(data['message'])
+                // console.log(data['message'])
                 // var messages = document.getElementById('messages')
                 // var message = document.createElement('li')
                 // var content = document.createTextNode(event.data)
@@ -95,6 +95,7 @@ class ConnectionManager:
 
     async def broadcast(self, message: object):
         for connection in self.active_connections:
+            print({k: v for k, v in message.items() if k != 'piano'})
             await connection.send_json(message)
 
 
@@ -103,14 +104,15 @@ manager = ConnectionManager()
 
 port = mido.open_input('IAC Driver Bus 1')
 playing_notes = set()
-scale = Scale.from_name('C', 'major')
+# scale = Scale.from_name('C', 'major')
+scale = Scale.from_name('F', 'minor')
 
 
 def chord_to_html(chord: SpecificChord) -> str:
     piano = Piano(
         note_colors=dict.fromkeys(chord.notes, config.RED),
         squares={note: {'text': str(note), 'text_size': '8'} for note in chord},
-        noterange=NoteRange(SpecificNote('C', 2), SpecificNote('C', 8))
+        noterange=NoteRange(SpecificNote('C', 2), SpecificNote('C', 10))
     )._repr_svg_()
     return f"""
     <div class='specificchord'>
